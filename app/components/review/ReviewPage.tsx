@@ -1,0 +1,130 @@
+"use client";
+
+import { VehicleDetails } from "@/components/review/VehicleDetails";
+import { ErrorFallback } from "@/components/shared/ErrorFallback";
+import { Button } from "@/components/shared/ui/button";
+import { Separator } from "@/components/shared/ui/separator";
+import { formatCents } from "@/lib/formatters";
+import { API } from "@/server/api";
+import { format, formatDuration, intervalToDuration } from "date-fns";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+import { MiniPageLayout } from "../shared/MiniPageLayout";
+
+function Timeline({ startDate, endDate }: { startDate: Date; endDate: Date }) {
+  return (
+    <div>
+      <div>
+        <span>Pick-up</span>
+        <p>{format(startDate, "PPpp")}</p>
+      </div>
+      <div>
+        <p>Rental period</p>
+      </div>
+      <div>
+        <span>Drop-off</span>
+        <p>{format(endDate, "PPpp")}</p>
+      </div>
+    </div>
+  );
+}
+
+function Content() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const start = searchParams.get("start");
+  const end = searchParams.get("end");
+
+  if (!id) {
+    throw new Error("No reservation ID found");
+  }
+
+  const vehicle = API.getVehicle(id);
+
+  if (!start || !end) {
+    return (
+      <div>
+        <VehicleDetails vehicle={vehicle} />
+        <Separator />
+        <div>
+          <h3>Reservation Summary</h3>
+          <p>Pickup and drop-off times are required to see your quote.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+
+  const quote = API.getQuote({
+    vehicleId: id,
+    startTime: startDate.toISOString(),
+    endTime: endDate.toISOString(),
+  });
+
+  const handleConfirm = () => {
+    console.error("Not implemented");
+  };
+
+  const formattedDuration = formatDuration(
+    intervalToDuration({
+      start: startDate,
+      end: endDate,
+    }),
+    { delimiter: ", " },
+  );
+
+  return (
+    <div>
+      <VehicleDetails vehicle={vehicle} />
+
+      <Separator />
+
+      <div>
+        <h3>Reservation Summary</h3>
+        <div>
+          <dl>
+            <div>
+              <dt>Hourly Rate</dt>
+              <dd>
+                <span>{formatCents(vehicle.hourly_rate_cents)}</span>
+                <span>/hr</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Duration</dt>
+              <dd>{formattedDuration}</dd>
+            </div>
+            <div>
+              <dt>Total Cost</dt>
+              <dd>{formatCents(quote.totalPriceCents)}</dd>
+            </div>
+          </dl>
+
+          <Timeline startDate={startDate} endDate={endDate} />
+        </div>
+
+        <Button onClick={handleConfirm}>Confirm reservation</Button>
+      </div>
+    </div>
+  );
+}
+
+export function ReviewPage() {
+  return (
+    <MiniPageLayout
+      title="Almost there"
+      subtitle="Your adventure is about to begin! Please confirm your reservation below."
+    >
+      <ErrorBoundary
+        fallback={<ErrorFallback message="Failed to load reservation" />}
+      >
+        <Suspense fallback={null}>
+          <Content />
+        </Suspense>
+      </ErrorBoundary>
+    </MiniPageLayout>
+  );
+}
