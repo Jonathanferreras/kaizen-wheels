@@ -30,7 +30,7 @@ model Vehicle {
 
 model Reservation {
   id                String   @id @default(uuid())
-  vehicle_id        String
+  vehicle_id        Int
   start_time        DateTime
   end_time          DateTime
   total_price_cents Int
