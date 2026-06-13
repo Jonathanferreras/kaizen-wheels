@@ -1,10 +1,10 @@
-import { API } from "@/server/api";
 import { VehicleListItem } from "./VehicleListItem";
+import { useVehicles } from "@/hooks/use-vehicles";
 
 export function VehicleList() {
-  const searchResponse = API.searchVehicles();
+  const { vehicles, loading, error } = useVehicles();
 
-  if (searchResponse.vehicles.length === 0) {
+  if (vehicles.length === 0) {
     return (
       <div>
         <p>No vehicles found.</p>
@@ -14,7 +14,7 @@ export function VehicleList() {
 
   return (
     <ul>
-      {searchResponse.vehicles.map((vehicle) => (
+      {vehicles.map((vehicle) => (
         <VehicleListItem key={vehicle.id} vehicle={vehicle} />
       ))}
     </ul>
