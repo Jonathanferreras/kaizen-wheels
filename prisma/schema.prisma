@@ -11,3 +11,31 @@ generator client {
 datasource db {
   provider = "sqlite"
 }
+
+model Vehicle {
+  id Int @id @default(autoincrement()) 
+  make String
+  model String
+  year Int
+  doors Int
+  max_passengers Int
+  classification String
+  thumbnail_url String
+  hourly_rate_cents Int
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  reservations      Reservation[]
+}
+
+model Reservation {
+  id                String   @id @default(uuid())
+  vehicle_id        String
+  start_time        DateTime
+  end_time          DateTime
+  total_price_cents Int
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  vehicle           Vehicle  @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
+}
