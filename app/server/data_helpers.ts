@@ -1,7 +1,18 @@
-import { Reservation, RESERVATIONS, Vehicle, VEHICLES } from "./data";
+import { Reservation, RESERVATIONS, VEHICLES } from "./data";
+import { prisma } from "../lib/prisma";
+import type { Prisma } from "../../generated/prisma/browser";
 
-export const getVehicleById = (id: string): Vehicle | undefined => {
-  return VEHICLES.find((car) => car.id === id);
+export type VehicleWithReservations = Prisma.VehicleGetPayload<{
+  include: { reservations: true };
+}>;
+
+export const getVehicleById = async (
+  id: string,
+): Promise<VehicleWithReservations | undefined> => {
+  return prisma.vehicle.findUnique({
+    where: { id: Number(id) },
+    include: { reservations: true },
+  });
 };
 
 export const getReservationById = (id: string): Reservation | undefined => {
@@ -9,5 +20,7 @@ export const getReservationById = (id: string): Reservation | undefined => {
 };
 
 export const getVehicles = () => {
-  return VEHICLES;
+  return prisma.vehicle.findMany({
+    include: { reservations: true },
+  });
 };

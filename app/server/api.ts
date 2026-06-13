@@ -3,6 +3,7 @@ import {
   getReservationById,
   getVehicleById,
   getVehicles,
+  VehicleWithReservations,
 } from "./data_helpers";
 
 const parseAndValidateTimeRange = (startTime: string, endTime: string) => {
@@ -38,7 +39,7 @@ const calculateTotalPrice = (
   };
 };
 
-const validateReservationAndGetVehicle = (input: {
+const validateReservationAndGetVehicle = async (input: {
   vehicleId: string;
   startTime: string;
   endTime: string;
@@ -46,7 +47,7 @@ const validateReservationAndGetVehicle = (input: {
   const { vehicleId, startTime, endTime } = input;
   const { start, end } = parseAndValidateTimeRange(startTime, endTime);
 
-  const vehicle = getVehicleById(vehicleId);
+  const vehicle = await getVehicleById(vehicleId);
 
   if (!vehicle) {
     throw new Error("NOT_FOUND: Vehicle not found");
@@ -55,14 +56,26 @@ const validateReservationAndGetVehicle = (input: {
   return { vehicle, start, end };
 };
 
-function searchVehicles() {
-  return {
-    vehicles: getVehicles(),
-  };
+async function searchVehicles(): Promise<{
+  vehicles: VehicleWithReservations[];
+}> {
+  let vehicles: VehicleWithReservations[] = [];
+
+  try {
+    vehicles = await getVehicles();
+
+    if (!vehicles) {
+      throw new Error("NOT_FOUND: Vehicles not found");
+    }
+  } catch (error) {
+    throw new Error(error);
+  }
+
+  return { vehicles };
 }
 
-function getVehicle(id: string) {
-  const vehicle = getVehicleById(id);
+async function getVehicle(id: string) {
+  const vehicle = await getVehicleById(id);
 
   if (!vehicle) {
     throw new Error("NOT_FOUND: Vehicle not found");
@@ -79,12 +92,12 @@ function getReservation(id: string) {
   return reservation;
 }
 
-function getQuote(input: {
+async function getQuote(input: {
   vehicleId: string;
   startTime: string;
   endTime: string;
 }) {
-  const { vehicle, start, end } = validateReservationAndGetVehicle(input);
+  const { vehicle, start, end } = await validateReservationAndGetVehicle(input);
   return calculateTotalPrice(start, end, vehicle.hourly_rate_cents);
 }
 
