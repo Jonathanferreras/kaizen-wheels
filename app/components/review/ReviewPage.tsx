@@ -5,13 +5,14 @@ import { ErrorFallback } from "@/components/shared/ErrorFallback";
 import { Button } from "@/components/shared/ui/button";
 import { Separator } from "@/components/shared/ui/separator";
 import { formatCents } from "@/lib/formatters";
-import { API } from "@/server/api";
 import { format, formatDuration, intervalToDuration } from "date-fns";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { MiniPageLayout } from "../shared/MiniPageLayout";
+import { useQuote } from "@/hooks/use-quote";
 import { useVehicles } from "@/hooks/use-vehicles";
+import { toIsoDateParam } from "@/lib/dates";
 
 function Timeline({ startDate, endDate }: { startDate: Date; endDate: Date }) {
   return (
@@ -34,20 +35,37 @@ function Timeline({ startDate, endDate }: { startDate: Date; endDate: Date }) {
 function Content() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
-  const start = searchParams.get("start");
-  const end = searchParams.get("end");
-  const { loading, error, getVehicleById } = useVehicles();
+  const start = toIsoDateParam(searchParams.get("start"));
+  const end = toIsoDateParam(searchParams.get("end"));
+  const {
+    loading: vehicleLoading,
+    error: vehicleError,
+    getVehicleById,
+  } = useVehicles();
+  const {
+    quote,
+    loading: quoteLoading,
+    error: quoteError,
+  } = useQuote({
+    vehicleId: id,
+    startTime: start,
+    endTime: end,
+  });
 
   if (!id) {
     throw new Error("No vehicle ID found.");
   }
 
-  if (loading) {
+  if (vehicleLoading) {
     return <div>Loading vehicle...</div>;
   }
 
-  if (error) {
-    throw error;
+  if (vehicleError) {
+    throw vehicleError;
+  }
+
+  if (quoteError) {
+    throw quoteError;
   }
 
   const vehicle = getVehicleById(id);
@@ -72,12 +90,6 @@ function Content() {
   const startDate = new Date(start);
   const endDate = new Date(end);
 
-  // const quote = API.getQuote({
-  //   vehicleId: id,
-  //   startTime: startDate.toISOString(),
-  //   endTime: endDate.toISOString(),
-  // });
-
   const handleConfirm = () => {
     console.error("Not implemented");
   };
@@ -89,6 +101,13 @@ function Content() {
     }),
     { delimiter: ", " },
   );
+
+  let totalCostContent = null;
+  if (quoteLoading) {
+    totalCostContent = "Loading quote...";
+  } else if (quote) {
+    totalCostContent = formatCents(quote.totalPriceCents);
+  }
 
   return (
     <div>
@@ -113,7 +132,7 @@ function Content() {
             </div>
             <div>
               <dt>Total Cost</dt>
-              {/* <dd>{formatCents(quote.totalPriceCents)}</dd> */}
+              <dd>{totalCostContent}</dd>
             </div>
           </dl>
 
