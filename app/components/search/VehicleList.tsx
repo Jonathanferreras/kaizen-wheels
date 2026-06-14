@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { areIntervalsOverlapping, endOfDay, startOfDay } from "date-fns";
-import { Calendar as CalendarIcon, DollarSign } from "lucide-react";
+import { Calendar as CalendarIcon, DollarSign, Users } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
 import { VehicleListItem } from "./VehicleListItem";
@@ -15,6 +15,13 @@ import { RangeSlider } from "@/components/shared/ui/slider";
 import { formatCents, formatDateRange } from "@/lib/formatters";
 import type { Vehicle } from "@/server/data";
 import type { VehicleWithReservations } from "@/server/data_helpers";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shared/ui/select";
 
 export function VehicleList({
   vehicles,
@@ -23,6 +30,7 @@ export function VehicleList({
 }) {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [priceRange, setPriceRange] = useState<[number, number]>();
+  const [passengerCount, setPassengerCount] = useState<number>(2);
 
   const maxPrice = useMemo(
     () => Math.max(0, ...vehicles.map((v) => v.hourly_rate_cents)),
@@ -31,6 +39,11 @@ export function VehicleList({
 
   const [minPrice, maxSelectedPrice] = priceRange ?? [0, maxPrice];
   const isPriceFilterActive = minPrice > 0 || maxSelectedPrice < maxPrice;
+
+  const maxPassengerCount = useMemo(
+    () => Math.max(0, ...vehicles.map((v) => v.max_passengers)),
+    [vehicles],
+  );
 
   const filteredVehicles = useMemo(() => {
     let result = vehicles;
@@ -60,8 +73,19 @@ export function VehicleList({
       });
     }
 
+    result = result.filter(
+      (vehicle) => passengerCount <= vehicle.max_passengers,
+    );
+
     return result;
-  }, [vehicles, dateRange, minPrice, maxSelectedPrice, isPriceFilterActive]);
+  }, [
+    vehicles,
+    dateRange,
+    minPrice,
+    maxSelectedPrice,
+    isPriceFilterActive,
+    passengerCount,
+  ]);
 
   return (
     <div>
@@ -112,6 +136,38 @@ export function VehicleList({
         </Popover>
         {isPriceFilterActive && (
           <Button variant="ghost" onClick={() => setPriceRange(undefined)}>
+            Clear
+          </Button>
+        )}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline">
+              <Users className="mr-2 h-4 w-4" />
+              <span>Passengers {passengerCount}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-40" align="start">
+            <Select
+              value={String(passengerCount)}
+              onValueChange={(value) => setPassengerCount(Number(value))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: maxPassengerCount }, (_, i) => i + 1).map(
+                  (count) => (
+                    <SelectItem key={count} value={String(count)}>
+                      {count}
+                    </SelectItem>
+                  ),
+                )}
+              </SelectContent>
+            </Select>
+          </PopoverContent>
+        </Popover>
+        {passengerCount !== 2 && (
+          <Button variant="ghost" onClick={() => setPassengerCount(2)}>
             Clear
           </Button>
         )}
