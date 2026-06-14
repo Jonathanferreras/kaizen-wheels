@@ -591,3 +591,25 @@ So I split it:
 - **`VehicleList`** — keeps the placeholder: `{formatDateRange(dateRange) ?? <span>Pick dates</span>}`
 
 That keeps `formatters` reusable (e.g. review page, tooltips) without coupling it to `react-day-picker` or specific UI text. The function accepts a minimal `{ from?: Date; to?: Date }` shape rather than importing `DateRange` into the lib.
+
+**Prompt**
+
+@app/components/search/VehicleList.tsx:132-133 I've started the implementation for a passenger count filter, can you finish it with minimal amount of code that matches the project coding style. By default it starts with 2 and the upper bound should be the max passenger count we have in the fleet of vehicles. This filter should work independently as well with the other filters.
+
+---
+
+**Response**
+
+I'll review the passenger filter stub and how the other filters are wired so we can finish it in the same style.
+
+Wiring up the Select with options 1–max fleet capacity, fixing the `useMemo` dependency, and aligning imports with the rest of the file.
+
+The passenger count filter is wired up. Here's what was added:
+
+**Select UI** — Options run from 1 through `maxPassengerCount` (8 in the current fleet, from the Pacifica). Default stays at 2.
+
+**Filtering** — Keeps vehicles where `passengerCount <= vehicle.max_passengers`, chained with the existing price and date filters in the same `useMemo` (always from the `vehicles` prop).
+
+**Clear button** — Shown when the count isn't 2, matching the date/price pattern and resetting back to the default.
+
+**Bug fix** — Added `passengerCount` to the `useMemo` dependency array so the list updates when the selection changes.
