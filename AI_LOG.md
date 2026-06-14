@@ -613,3 +613,179 @@ The passenger count filter is wired up. Here's what was added:
 **Clear button** — Shown when the count isn't 2, matching the date/price pattern and resetting back to the default.
 
 **Bug fix** — Added `passengerCount` to the `useMemo` dependency array so the list updates when the selection changes.
+
+# API.getQuote approach options
+
+_Exported on 6/14/2026 at 14:09:34 EDT from Cursor (3.2.21)_
+
+---
+
+**Prompt**
+
+@/Users/jonathanferreras/Dev/interviews/kaizen-labs/kaizen-wheels/app/components/review/ReviewPage.tsx:1-145 what would you recommend would be the best approach to fix the broken API.getQuote? don't make any changes just present options that match existing patterns
+
+---
+
+**Response**
+
+I'll trace how `API.getQuote` is defined and how similar data fetching is done elsewhere in the app so the options match your existing patterns.
+
+The broken call isn’t really `getQuote` itself — that logic in `app/server/api.ts` looks fine. The problem is **how** `ReviewPage` tries to use it: a `"use client"` component calling `API.getQuote(...)` synchronously during render. That conflicts with both Next.js boundaries (server/DB code in the browser) and the async signature of `getQuote`.
+
+The codebase has already moved to a different pattern: **client hook → `fetch` → route handler → `API.*`**.
+
+```12:22:app/hooks/use-vehicles.ts
+        const response = await fetch("/api/v1/vehicles");
+        // ...
+        setVehicles(data.vehicles);
+```
+
+```4:12:app/api/v1/vehicles/route.ts
+export async function GET() {
+  try {
+    const vehicles = await API.searchVehicles();
+    // ...
+    return NextResponse.json(vehicles);
+```
+
+There’s also a stub in `use-vehicles.ts` (`getVehicleQuote = useCallback()`) that hints at the intended direction.
+
+---
+
+## Recommended: API route + client hook (matches existing pattern)
+
+**What:** Add a quote route handler that delegates to `API.getQuote`, then fetch it from the client the same way `useVehicles` does.
+
+**Shape options (both fit the repo):**
+
+| Route                                             | Example                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------ |
+| Nested under vehicle                              | `GET /api/v1/vehicles/[id]/quote?start=...&end=...`          |
+| Query-param style (like existing `[id]/route.ts`) | `GET /api/v1/quotes?vehicleId=...&startTime=...&endTime=...` |
+
+**Client side:** Either finish the stub in `use-vehicles.ts`, or add a dedicated `useQuote(vehicleId, start, end)` hook with the same `loading` / `error` / data shape as `useVehicles`.
+
+**Why this fits best:**
+
+- Same layering as vehicles and reservations
+- Keeps Luxon validation, DB access, and future discount/add-on logic server-side in `api.ts`
+- `ReviewPage` already handles async loading/error for the vehicle — quote fits the same flow
+- Part 5 (“live total as add-ons toggle”) maps cleanly to re-fetching when `addOnIds` change
+
+**ReviewPage wiring would look like:**
+
+1. Read `id`, `start`, `end` from search params (already done)
+2. Call `useQuote(id, start, end)` when dates exist
+3. Show loading/error states parallel to vehicle loading
+4. Render `quote.totalPriceCents` (and later breakdown fields)
+
+---
+
+## Option 2: Extend `useVehicles` instead of a new hook
+
+**What:** Complete `getVehicleQuote` inside `use-vehicles.ts` — a `fetch` to the new quote route, keyed by `(vehicleId, start, end)`.
+
+**Pros:** One hook for review page data; aligns with the existing stub.
+
+**Cons:** Quotes depend on dates (and soon add-ons), not the vehicle list. Mixing list caching with quote fetching can get awkward — e.g. quote refetches on every add-on toggle while vehicle data stays static.
+
+**When to pick it:** If you want minimal file count and review is the only quote consumer.
+
+---
+
+## Option 3: Server Component fetch at the page boundary
+
+**What:** Make `app/review/page.tsx` (or a server wrapper) read search params, call `API.getQuote` directly, and pass the result as props to a client sub-component for add-ons/confirm.
+
+**Pros:** No extra HTTP round-trip; natural for SSR of the initial quote.
+
+**Cons:** Less established here — search and review are fully client-side with hooks today. Add-on toggles (Part 5) still need client re-fetch or a hybrid anyway. You’d split `ReviewPage` into server + client pieces.
+
+**When to pick it:** If you want SSR for the initial quote and are OK introducing a server/client split that the rest of the app doesn’t use yet.
+
+---
+
+## Option 4: Server Actions
+
+**What:** Add something like `getQuoteAction` in `app/lib/actions.ts` and call it from the client.
+
+**Pros:** Mentioned in `AI_LOG.md` as a valid path; keeps logic on the server.
+
+**Cons:** No server actions exist yet — vehicles/reservations already use route handlers. Introducing a second client→server pattern adds inconsistency unless you migrate everything.
+
+**When to pick it:** If you plan to use actions for `handleConfirm` (create reservation) and want one mechanism for all mutations/queries.
+
+---
+
+## Options I’d avoid (don’t match project direction)
+
+**Client-side price calculation** — Duplicating `calculateTotalPrice` in the browser with `date-fns` breaks server authority for discounts (Part 4) and add-ons (Part 5), and diverges from Luxon logic in `api.ts`.
+
+**Uncomment and `await` the direct `API.getQuote` import** — Still bundles server/Prisma code into a client component; won’t work reliably once DB access is required.
+
+**Fix only the async call without a route** — Even wrapping in `useEffect` + direct import doesn’t solve the client/server boundary.
+
+---
+
+## Practical recommendation
+
+Go with **Option 1** (route + hook):
+
+1. **Route:** `app/api/v1/vehicles/[id]/quote/route.ts` — read `start`/`end` from query params, call `API.getQuote`, return JSON (mirror error handling in existing routes).
+2. **Hook:** `useQuote` with `{ quote, loading, error }`, triggered when all three inputs are present.
+3. **ReviewPage:** Replace the commented block with hook usage; keep `ErrorBoundary` for thrown errors.
+4. **Extend later:** Add `addOnIds` query param to the same route as Part 5 lands; extend `getQuote` in `api.ts` for discounts/breakdown (Part 4) without changing the client architecture.
+
+One related fix outside this question: `VehicleListItem` links to `/review?id=...` without `start`/`end`, so the review page often hits the “times required” branch before a quote can ever run. Passing dates through that link (or shared search state) is a prerequisite for the quote flow to work end-to-end.
+
+---
+
+**Prompt**
+
+I'm currently building the quote feature for the review page. I created an endpoint for server side calculation of total cost of reserving a specific vehicle. at the moment im only getting hourlyRateCents back. can you investigate the bug?
+
+---
+
+**Response**
+
+Investigating the quote flow from the API endpoint through the hook to the review page.
+
+Checking how dates are passed to the review page and testing the quote calculation.
+
+Confirming the date-format hypothesis — testing the API directly:
+
+Identified the bug: review links pass JavaScript `Date.toString()` values, but the quote API parses with Luxon's `fromISO()`, so dates fail validation silently and duration becomes 0 — leaving `totalPriceCents` at 0 while `hourlyRateCents` is correct. Fixing the URL date format and tightening server-side validation.
+
+Here's what was going wrong.
+
+## Root cause
+
+The quote API logic in `api.ts` is fine — it returns `totalPriceCents`, `hourlyRateCents`, and `durationInHours`. The problem was **date format mismatch** between the review page URL and the server parser.
+
+1. **Non-ISO dates in the URL** — `VehicleListItem` built the review link like this:
+
+```50:50:app/components/search/VehicleListItem.tsx
+href={`/review?id=${vehicle.id}&start=${dates.start}&end=${dates.end}`}
+```
+
+Interpolating a `Date` uses JavaScript's default string format, e.g. `Sat Jun 14 2025 20:00:00 GMT-0400 (Eastern Daylight Time)`.
+
+2. **Server expects ISO 8601** — `parseAndValidateTimeRange` uses `DateTime.fromISO()`, which can't parse that format.
+
+3. **Validation didn't catch it** — The check compared against `"Invalid Date"` (native `Date` behavior), but Luxon returns `"Invalid DateTime"`. Invalid dates slipped through.
+
+4. **Duration became 0** — Diffing invalid Luxon datetimes yields `0` hours, so:
+   - `hourlyRateCents` — correct (from the vehicle record)
+   - `totalPriceCents` — `0` (rate × 0 hours)
+   - `durationInHours` — `0`
+
+## Fixes applied
+
+1. **`VehicleListItem.tsx`** — Pass ISO strings in the URL with `.toISOString()`.
+2. **`api.ts`** — Validate with Luxon's `.isValid` so bad dates return a clear 400 instead of a silent `$0` quote.
+
+After the fix, a 3-day rental at $45/hr correctly returns `{ totalPriceCents: 324000, hourlyRateCents: 4500, durationInHours: 72 }`.
+
+Re-test by selecting dates on the search page and clicking "Book now" — the review page should show the correct total cost.
+
+---
