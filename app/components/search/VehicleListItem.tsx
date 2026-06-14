@@ -3,7 +3,13 @@ import { Vehicle } from "@/server/data";
 import { useBase64Image } from "@/util/useBase64Image";
 import Link from "next/link";
 
-export function VehicleListItem({ vehicle }: { vehicle: Vehicle }) {
+export function VehicleListItem({
+  vehicle,
+  dates,
+}: {
+  vehicle: Vehicle;
+  dates: { start: Date; end: Date };
+}) {
   const imgData = useBase64Image(vehicle.thumbnail_url);
 
   return (
@@ -39,7 +45,15 @@ export function VehicleListItem({ vehicle }: { vehicle: Vehicle }) {
           {formatCents(vehicle.hourly_rate_cents)}
           <span>/hr</span>
         </p>
-        <Link href={`/review?id=${vehicle.id}`}>Book now</Link>
+        {dates.start && dates.end ? (
+          <Link
+            href={`/review?id=${vehicle.id}&start=${dates.start}&end=${dates.end}`}
+          >
+            Book now
+          </Link>
+        ) : (
+          <span>Select dates for availability</span>
+        )}
       </div>
     </li>
   );

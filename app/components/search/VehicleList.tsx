@@ -180,6 +180,7 @@ export function VehicleList({
             <VehicleListItem
               key={vehicle.id}
               vehicle={vehicle as unknown as Vehicle}
+              dates={{ start: dateRange?.from, end: dateRange?.to }}
             />
           ))}
         </ul>
