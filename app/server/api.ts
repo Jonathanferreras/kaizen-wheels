@@ -1,3 +1,4 @@
+import { parseDateTimeParam } from "@/lib/dates";
 import { DateTime } from "luxon";
 import {
   getReservationById,
@@ -7,13 +8,10 @@ import {
 } from "./data_helpers";
 
 const parseAndValidateTimeRange = (startTime: string, endTime: string) => {
-  const start = DateTime.fromISO(startTime);
-  const end = DateTime.fromISO(endTime);
+  const start = parseDateTimeParam(startTime);
+  const end = parseDateTimeParam(endTime);
 
-  if (
-    start.toString() === "Invalid Date" ||
-    end.toString() === "Invalid Date"
-  ) {
+  if (!start || !end) {
     throw new Error(
       "BAD REQUEST: Invalid date format. Please use ISO 8601 format.",
     );
