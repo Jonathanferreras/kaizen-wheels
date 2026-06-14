@@ -439,3 +439,155 @@ Files You Can Mostly Leave Alone
 [postcss.config.js](postcss.config.js), [tsconfig.json](tsconfig.json) — config, no feature changes
 
 [app/util/useBase64Image.ts](app/util/useBase64Image.ts) — works as-is for thumbnails
+
+**Prompt**
+
+Based on the packages installed in this project, are there any ready to use nice looking components i can use for building out filter controls like date picker, ranges etc.
+
+**Response**
+
+Yes — this project is set up like shadcn/ui: Radix primitives + Tailwind, with a full component library already in app/components/shared/ui/. You can build filter controls from those without adding packages.
+
+Ready to use now
+Filter type Component Import path
+Numeric range (price, mileage)
+RangeSlider (dual-thumb) or Slider (single)
+@/components/shared/ui/slider
+Dropdown / enum (make, model, status)
+Select + SelectTrigger, SelectContent, SelectItem
+@/components/shared/ui/select
+Multi-select toggles (features, body type)
+ToggleGroup + ToggleGroupItem
+@/components/shared/ui/toggle-group
+Single choice (sort order)
+RadioGroup
+@/components/shared/ui/radio-group
+Boolean (in stock, certified)
+Checkbox or Switch
+@/components/shared/ui/checkbox or switch
+Text search
+Input + Label
+@/components/shared/ui/input, label
+Filter panel / modal
+Sheet or Dialog
+@/components/shared/ui/sheet or dialog
+Grouped filters
+Tabs
+@/components/shared/ui/tabs
+Form wiring + validation
+Form (react-hook-form + zod)
+@/components/shared/ui/form
+RangeSlider is already set up for min/max ranges:
+
+slider.tsx
+Lines 26-47
+const RangeSlider = React.forwardRef<
+React.ElementRef<typeof SliderPrimitive.Root>,
+React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root>
+
+> (({ className, ...props }, ref) => (
+> <SliderPrimitive.Root
+
+    // ...
+
+>
+
+    {/* two thumbs for range selection */}
+
+</SliderPrimitive.Root>
+));
+Date picker — almost ready
+You have the pieces, but not a pre-wired DatePicker component:
+
+Calendar — styled wrapper around react-day-picker (supports mode="single" and mode="range")
+Popover — dropdown shell for the calendar
+Button — trigger showing the selected date(s)
+date-fns / luxon — formatting
+Typical pattern (shadcn-style):
+
+<Popover>
+  <PopoverTrigger asChild>
+    <Button variant="outline">Pick a date</Button>
+  </PopoverTrigger>
+  <PopoverContent>
+    <Calendar mode="range" selected={range} onSelect={setRange} />
+  </PopoverContent>
+</Popover>
+Calendar already has range styling (day_range_end, day_range_middle, etc.), so date ranges will look correct once you compose it.
+
+What’s not included
+There is no dedicated DatePicker file yet — you compose Popover + Button + Calendar. There’s also no Combobox (searchable select) or Command palette; for searchable dropdowns you’d add those from shadcn or build on Popover + Input.
+
+Suggested mapping for vehicle search filters
+Price / mileage range → RangeSlider + Label
+Make / model / year → Select or ToggleGroup
+Date listed / available from–to → Popover + Calendar (mode="range")
+Features (multi) → ToggleGroup (type="multiple") or Checkbox list
+Mobile filter drawer → Sheet
+Filter form state → Form + zod schema
+If you want, I can add a reusable DatePicker / DateRangePicker in app/components/shared/ui/ and wire it into the search page.
+
+**Prompt**
+
+@app/components/search/VehicleList.tsx:1-37 with very minimal changes and matching the coding conventions and style of the project, implement a filter based on dates. Ideally the user can select a date range and the vehicle list will filter out cars that already have reservations in that date range. The ui element should be a date picker and leverage as much as possible from what exists in the project currently. When the user resets the dates, the vehicle list should show all the vehicles again. The filtering should always use the vehicles prop as the source of truth instead of filtering using filtered vehicles state.
+
+**Response**
+
+Exploring the codebase for vehicle/reservation data shapes and existing date-picker patterns.
+
+Implementing the date-range filter with existing Popover, Calendar, and Button components. Checking react-day-picker's `DateRange` type and whether `VehicleList` needs `"use client"`.
+
+Fixing a pre-existing type mismatch: Prisma vehicle IDs are numbers while `VehicleListItem` expects string IDs.
+
+Implemented the date-range availability filter in `VehicleList.tsx`. Here's what it does:
+
+**Date picker UI** — Uses the existing `Popover` + `Button` + `Calendar` stack (shadcn-style) with `mode="range"` and a two-month calendar. The trigger shows the selected range formatted with `date-fns` (same as `ReviewPage`).
+
+**Filtering logic** — `useMemo` always derives from the `vehicles` prop. When both `from` and `to` are set, it excludes vehicles with any reservation that overlaps the range (using `areIntervalsOverlapping` with `startOfDay` / `endOfDay` so whole days count). With no range or only a start date selected, all vehicles are shown.
+
+**Reset** — A "Clear" button sets `dateRange` back to `undefined`, which restores the full list.
+
+The date picker stays visible even when the filtered list is empty, so users can adjust their selection without losing the control.
+
+---
+
+**Prompt**
+
+@app/components/search/VehicleList.tsx:57-68 I'm not a fan of nested ternary expressions, can you express this logic more intuitively
+
+---
+
+**Response**
+
+Extracting a small helper with early returns to replace the nested ternary.
+
+Extracted the label logic into `formatDateRangeLabel`, which uses early returns for each case:
+
+1. No start date → placeholder
+2. Start only → single formatted date
+3. Start and end → formatted range string
+
+The button now just calls `{formatDateRangeLabel(dateRange)}`.
+
+---
+
+**Prompt**
+
+@app/components/search/VehicleList.tsx:22-34 would it make better sense to abstract this to lib/formatters.tsx and import into this component instead?
+
+---
+
+**Response**
+
+Partially — pure date formatting belongs in `formatters.tsx`; the "Pick dates" placeholder should stay in the component. `formatters.tsx` already has an incomplete copy; I'll finish the refactor that way.
+
+Yes, but only the formatting part — not the whole function as-is.
+
+`formatters.tsx` already follows a pattern of pure string helpers (`formatCents`, `formatDollars`). The date logic fits there. Returning `<span>Pick dates</span>` does not; that's UI copy tied to this picker, and it would pull JSX/React concerns into a module that otherwise has none.
+
+So I split it:
+
+- **`formatDateRange`** in `formatters.tsx` — returns a formatted string, or `null` when no start date is selected
+- **`VehicleList`** — keeps the placeholder: `{formatDateRange(dateRange) ?? <span>Pick dates</span>}`
+
+That keeps `formatters` reusable (e.g. review page, tooltips) without coupling it to `react-day-picker` or specific UI text. The function accepts a minimal `{ from?: Date; to?: Date }` shape rather than importing `DateRange` into the lib.
