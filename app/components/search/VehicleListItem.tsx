@@ -47,7 +47,7 @@ export function VehicleListItem({
         </p>
         {dates.start && dates.end ? (
           <Link
-            href={`/review?id=${vehicle.id}&start=${dates.start}&end=${dates.end}`}
+            href={`/review?id=${vehicle.id}&start=${dates.start.toISOString()}&end=${dates.end.toISOString()}`}
           >
             Book now
           </Link>
