@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export const useVehicles = () => {
   const [vehicles, setVehicles] = useState([]);
@@ -32,5 +32,12 @@ export const useVehicles = () => {
     }
   }, [vehicles]);
 
-  return { vehicles, loading, error };
+  const getVehicleById = useCallback(
+    (id: string) => {
+      return vehicles.find((vehicle) => String(vehicle.id) === id);
+    },
+    [vehicles],
+  );
+
+  return { vehicles, loading, error, getVehicleById };
 };

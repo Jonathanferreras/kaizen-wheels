@@ -11,6 +11,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { MiniPageLayout } from "../shared/MiniPageLayout";
+import { useVehicles } from "@/hooks/use-vehicles";
 
 function Timeline({ startDate, endDate }: { startDate: Date; endDate: Date }) {
   return (
@@ -35,12 +36,25 @@ function Content() {
   const id = searchParams.get("id");
   const start = searchParams.get("start");
   const end = searchParams.get("end");
+  const { loading, error, getVehicleById } = useVehicles();
 
   if (!id) {
-    throw new Error("No reservation ID found");
+    throw new Error("No vehicle ID found.");
   }
 
-  const vehicle = API.getVehicle(id);
+  if (loading) {
+    return <div>Loading vehicle...</div>;
+  }
+
+  if (error) {
+    throw error;
+  }
+
+  const vehicle = getVehicleById(id);
+
+  if (!vehicle) {
+    return <div>Vehicle not found.</div>;
+  }
 
   if (!start || !end) {
     return (
@@ -58,11 +72,11 @@ function Content() {
   const startDate = new Date(start);
   const endDate = new Date(end);
 
-  const quote = API.getQuote({
-    vehicleId: id,
-    startTime: startDate.toISOString(),
-    endTime: endDate.toISOString(),
-  });
+  // const quote = API.getQuote({
+  //   vehicleId: id,
+  //   startTime: startDate.toISOString(),
+  //   endTime: endDate.toISOString(),
+  // });
 
   const handleConfirm = () => {
     console.error("Not implemented");
@@ -99,7 +113,7 @@ function Content() {
             </div>
             <div>
               <dt>Total Cost</dt>
-              <dd>{formatCents(quote.totalPriceCents)}</dd>
+              {/* <dd>{formatCents(quote.totalPriceCents)}</dd> */}
             </div>
           </dl>
 
