@@ -44,6 +44,7 @@ const calculateTotalPrice = (
   } else if (isMultiDay) {
     totalPriceCents = multiDayCost;
     discountType = "MULTI_DAY";
+    hourlyRateCents = hourlyRateCents - 1000;
   } else if (hasHoliday) {
     totalPriceCents = holidayCost;
     discountType = "HOLIDAY";

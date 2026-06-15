@@ -1,9 +1,12 @@
+import { Discounts } from "@/server/data";
 import { useEffect, useState } from "react";
 
 export type Quote = {
   totalPriceCents: number;
   hourlyRateCents: number;
   durationInHours: number;
+  discountApplied: boolean;
+  discountType: Discounts;
 };
 
 type UseQuoteInput = {
@@ -12,11 +15,7 @@ type UseQuoteInput = {
   endTime: string | null | undefined;
 };
 
-export const useQuote = ({
-  vehicleId,
-  startTime,
-  endTime,
-}: UseQuoteInput) => {
+export const useQuote = ({ vehicleId, startTime, endTime }: UseQuoteInput) => {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);

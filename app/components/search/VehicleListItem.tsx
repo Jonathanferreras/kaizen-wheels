@@ -1,3 +1,4 @@
+import { useQuote } from "@/hooks/use-quote";
 import { formatCents } from "@/lib/formatters";
 import { Vehicle } from "@/server/data";
 import { useBase64Image } from "@/util/useBase64Image";
@@ -10,7 +11,37 @@ export function VehicleListItem({
   vehicle: Vehicle;
   dates: { start: Date; end: Date };
 }) {
+  let totalCostContent;
   const imgData = useBase64Image(vehicle.thumbnail_url);
+  const startDate = dates?.start?.toISOString();
+  const endDate = dates?.end?.toISOString();
+  const {
+    quote,
+    loading: quoteLoading,
+    error: quoteError,
+  } = useQuote({
+    vehicleId: vehicle.id,
+    startTime: startDate,
+    endTime: endDate,
+  });
+
+  if (quoteError) {
+    throw quoteError;
+  }
+
+  if (quoteLoading) {
+    totalCostContent = "Loading quote...";
+  } else if (quote) {
+    totalCostContent = formatCents(quote?.totalPriceCents);
+  }
+
+  const renderDiscountType = () => {
+    if (quote.discountType === "HOLIDAY") {
+      return <span>Holiday Discount 17% OFF</span>;
+    } else if (quote.discountType === "MULTI_DAY") {
+      return <span>Multi-day Discount $10/hr OFF</span>;
+    }
+  };
 
   return (
     <li>
@@ -42,14 +73,24 @@ export function VehicleListItem({
       </div>
       <div>
         <p>
-          {formatCents(vehicle.hourly_rate_cents)}
+          {quote?.discountType === "MULTI_DAY" ? (
+            <>
+              <s>{formatCents(vehicle.hourly_rate_cents)}</s>
+              <span>{formatCents(quote?.hourlyRateCents)}</span>
+            </>
+          ) : (
+            <span>{formatCents(vehicle.hourly_rate_cents)}</span>
+          )}
           <span>/hr</span>
         </p>
         {dates.start && dates.end ? (
           <Link
             href={`/review?id=${vehicle.id}&start=${dates.start.toISOString()}&end=${dates.end.toISOString()}`}
           >
-            Book now
+            <p>
+              Book now for {totalCostContent}{" "}
+              {quote?.discountApplied && renderDiscountType()}
+            </p>
           </Link>
         ) : (
           <span>Select dates for availability</span>
