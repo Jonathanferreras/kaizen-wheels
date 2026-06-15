@@ -230,3 +230,18 @@ export const RESERVATIONS: Reservation[] = [
     total_price_cents: 3000,
   },
 ];
+
+export type Discounts = "NONE" | "HOLIDAY" | "MULTI_DAY";
+
+export const HOLIDAYS = [
+  "01/21",
+  "02/12",
+  "03/04",
+  "05/02",
+  "06/16",
+  "07/26",
+  "08/03",
+  "09/01",
+  "11/05", // My actual birthday!!!
+  "12/18",
+];

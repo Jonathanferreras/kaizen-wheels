@@ -6,6 +6,7 @@ import {
   getVehicles,
   VehicleWithReservations,
 } from "./data_helpers";
+import { Discounts, HOLIDAYS } from "./data";
 
 const parseAndValidateTimeRange = (startTime: string, endTime: string) => {
   const start = parseDateTimeParam(startTime);
@@ -29,11 +30,31 @@ const calculateTotalPrice = (
   hourlyRateCents: number,
 ) => {
   const durationInHours = end.diff(start, "hours").hours || 0;
+  const hasHoliday = HOLIDAYS.some((h) => includesHoliday(h, start, end));
+  const isMultiDay = end.diff(start, "days").days > 3;
+  const baseCost = hourlyRateCents * durationInHours;
+  const holidayCost = baseCost * 0.83;
+  const multiDayCost = (hourlyRateCents - 1000) * durationInHours;
+  let totalPriceCents = baseCost;
+  let discountType: Discounts = "NONE";
+
+  if (hasHoliday && isMultiDay) {
+    totalPriceCents = Math.min(holidayCost, multiDayCost);
+    discountType = holidayCost < multiDayCost ? "HOLIDAY" : "MULTI_DAY";
+  } else if (isMultiDay) {
+    totalPriceCents = multiDayCost;
+    discountType = "MULTI_DAY";
+  } else if (hasHoliday) {
+    totalPriceCents = holidayCost;
+    discountType = "HOLIDAY";
+  }
 
   return {
-    totalPriceCents: hourlyRateCents * durationInHours,
+    totalPriceCents,
     hourlyRateCents,
     durationInHours,
+    discountType,
+    discountApplied: discountType !== null,
   };
 };
 
@@ -97,6 +118,20 @@ async function getQuote(input: {
 }) {
   const { vehicle, start, end } = await validateReservationAndGetVehicle(input);
   return calculateTotalPrice(start, end, vehicle.hourly_rate_cents);
+}
+
+function includesHoliday(
+  holidayDate: string,
+  startDate: DateTime,
+  endDate: DateTime,
+) {
+  const holiday = DateTime.fromFormat(holidayDate, "LL/dd")
+    .set({ year: startDate.year })
+    .startOf("day");
+  const startDay = startDate.startOf("day");
+  const endDay = endDate.startOf("day");
+
+  return holiday > startDay && holiday < endDay;
 }
 
 export const API = {
