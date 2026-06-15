@@ -789,3 +789,243 @@ After the fix, a 3-day rental at $45/hr correctly returns `{ totalPriceCents: 32
 Re-test by selecting dates on the search page and clicking "Book now" — the review page should show the correct total cost.
 
 ---
+
+**Prompt**
+
+I want to start working on the feature of displaying discounts on the search page to handle the following conditions = "A reservation that includes a holiday but does not start or end on that holidayreceives a 17% discount off the total price. A reservation longer than 3 days receives a $10/hr discount on the hourly rate. The discounts cannot stack — if both apply, take the one that produces thebetter price. Fictional holidays: Jan 21, Feb 12, Mar 04, May 02, Jun 16, Jul 26, Aug 03, Sep 01,Nov 05, Dec 18.". What are the files of interest when implementing this feature and what can i leverage or extend that already exists. dont make any changes just explanations and planning.
+
+---
+
+**Response**
+
+I'll map how search, pricing, and dates work in the codebase so we can plan the discount feature without changing anything.
+
+Here is a planning map for the discount feature, based on how the codebase is structured today.
+
+## Architecture overview
+
+Pricing is **server-authoritative** today: the client does not compute totals. Search only shows the raw hourly rate; the review page fetches a quote via API. Discounts should follow that same pattern — implement once on the server, then surface the enriched quote on search and review.
+
+```mermaid
+flowchart LR
+  subgraph search [Search Page]
+    VL[VehicleList] --> VLI[VehicleListItem]
+    VLI -->|"dates selected"| Quote1[useQuote hook]
+  end
+  subgraph review [Review Page]
+    RP[ReviewPage] --> Quote2[useQuote hook]
+  end
+  Quote1 --> API["GET /api/v1/vehicles/:id/quote"]
+  Quote2 --> API
+  API --> Calc["calculateTotalPrice in api.ts"]
+```
+
+---
+
+## Files of interest
+
+### Core logic (start here)
+
+| File                                                                                 | Role today                                                                                                 | What you'll extend                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`app/server/api.ts`](app/server/api.ts)                                             | `calculateTotalPrice` returns `{ totalPriceCents, hourlyRateCents, durationInHours }`; `getQuote` calls it | **Main implementation site.** Add holiday + multi-day rules, non-stacking comparison, and a richer return shape (e.g. `basePriceCents`, `discountCents`, `discountType`, `totalPriceCents`) |
+| [`app/api/v1/vehicles/[id]/quote/route.ts`](app/api/v1/vehicles/[id]/quote/route.ts) | Proxies to `API.getQuote`                                                                                  | Likely no changes — it already passes through whatever `getQuote` returns                                                                                                                   |
+
+`calculateTotalPrice` is the single source of truth:
+
+```26:38:app/server/api.ts
+const calculateTotalPrice = (
+  start: DateTime,
+  end: DateTime,
+  hourlyRateCents: number,
+) => {
+  const durationInHours = end.diff(start, "hours").hours || 0;
+
+  return {
+    totalPriceCents: hourlyRateCents * durationInHours,
+    hourlyRateCents,
+    durationInHours,
+  };
+};
+```
+
+### Shared types & client fetching
+
+| File                                               | Role today                                                 | What you'll extend                                                                       |
+| -------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| [`app/hooks/use-quote.ts`](app/hooks/use-quote.ts) | Defines `Quote` type; fetches `/api/v1/vehicles/:id/quote` | Extend `Quote` with discount fields so TypeScript matches the new API response           |
+| [`app/lib/dates.ts`](app/lib/dates.ts)             | `parseDateTimeParam` (Luxon) used by server validation     | Reuse for consistent date parsing; may add helpers for "is this calendar day a holiday?" |
+| [`app/lib/formatters.tsx`](app/lib/formatters.tsx) | `formatCents`, `formatDateRange`                           | Reuse for strikethrough base price vs discounted total on search/review                  |
+
+### Search page (where discounts must appear)
+
+| File                                                                                     | Role today                                                                             | What you'll extend                                                                                                               |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| [`app/components/search/VehicleList.tsx`](app/components/search/VehicleList.tsx)         | Owns `dateRange` filter state; passes `dates` to each item                             | Already passes selected dates — no structural change needed unless you want to lift quote fetching up to avoid N requests        |
+| [`app/components/search/VehicleListItem.tsx`](app/components/search/VehicleListItem.tsx) | Shows `$X/hr` only; links to review with `start`/`end` query params when dates are set | **Primary search UI work.** Call `useQuote` when dates exist; show estimated total, discount badge, and/or strikethrough pricing |
+| [`app/components/search/SearchPage.tsx`](app/components/search/SearchPage.tsx)           | Thin wrapper around `VehicleList`                                                      | Probably unchanged                                                                                                               |
+
+`VehicleListItem` already wires dates into the review URL but does not fetch a quote:
+
+```48:56:app/components/search/VehicleListItem.tsx
+        {dates.start && dates.end ? (
+          <Link
+            href={`/review?id=${vehicle.id}&start=${dates.start.toISOString()}&end=${dates.end.toISOString()}`}
+          >
+            Book now
+          </Link>
+        ) : (
+          <span>Select dates for availability</span>
+        )}
+```
+
+### Review page (checkout — also required by spec)
+
+| File                                                                           | Role today                                                  | What you'll extend                                                                                             |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| [`app/components/review/ReviewPage.tsx`](app/components/review/ReviewPage.tsx) | Already uses `useQuote`; shows hourly rate, duration, total | Add line-item breakdown: base rental, discount row, final total. Will mostly consume the extended `Quote` type |
+
+### Likely new file(s)
+
+| New file                                                                         | Purpose                                                                              |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `app/lib/holidays.ts` or constants in [`app/server/data.ts`](app/server/data.ts) | The 10 fictional holiday dates (month/day)                                           |
+| `app/lib/pricing.ts` or `app/server/discounts.ts` (optional)                     | Pure functions for eligibility + math — keeps `api.ts` thin and is easy to unit test |
+
+No discount or holiday logic exists anywhere in the repo yet.
+
+### Documentation (when you implement)
+
+| File                           | Why                                                            |
+| ------------------------------ | -------------------------------------------------------------- |
+| [`DECISIONS.md`](DECISIONS.md) | Document ambiguous rule interpretations (see below)            |
+| [`README.md`](README.md)       | Already describes the rules — your implementation should match |
+
+---
+
+## What you can leverage today
+
+1. **Quote pipeline is already built end-to-end** — `getQuote` → route → `useQuote` → `ReviewPage`. Extend the return shape and both pages benefit.
+
+2. **`useQuote` on search** — Import it in `VehicleListItem` (same pattern as `ReviewPage`). Pass `vehicle.id`, `dates.start.toISOString()`, `dates.end.toISOString()`.
+
+3. **Luxon on the server** — `parseAndValidateTimeRange` already gives you `DateTime` start/end. Use Luxon for duration (`diff`) and calendar-day checks.
+
+4. **Date range state on search** — `VehicleList` already requires both `from` and `to` before showing "Book now". Discount UI can use the same gate: only fetch/show quotes when both dates are set.
+
+5. **`formatCents`** — Ready for base vs discounted display.
+
+6. **Review URL params** — Search → review date handoff already works via ISO strings and `toIsoDateParam`.
+
+---
+
+## Implementation plan
+
+### Step 1: Define constants and pure pricing functions
+
+```typescript
+// Conceptual shape
+const HOLIDAYS = [{ month: 1, day: 21 }, { month: 2, day: 12 }, ...];
+
+type DiscountType = "holiday" | "multi_day" | null;
+
+function calculateQuote(start, end, hourlyRateCents) {
+  const basePriceCents = hourlyRateCents * durationHours;
+
+  const holidayTotal = appliesHolidayDiscount ? base * 0.83 : base;
+  const multiDayTotal = (hourlyRateCents - 1000) * durationHours; // $10/hr = 1000¢
+
+  // pick lower total, set discountType accordingly
+}
+```
+
+### Step 2: Implement the two discount rules
+
+**Holiday (17% off total):**
+
+- Reservation **includes** at least one holiday calendar day.
+- Reservation does **not** start or end on that holiday's calendar day.
+- Interpretation to decide upfront: compare month/day of each holiday against the calendar days spanned by `[start, end)`, excluding the start and end calendar days.
+
+**Multi-day ($10/hr off hourly rate):**
+
+- Reservation is **longer than 3 days**.
+- Clarify: calendar days (e.g. Jan 1 9am → Jan 5 9am = 4 calendar days) vs strictly `duration > 72 hours`. The README says "more than 3 days," which usually means calendar-day span.
+
+**Non-stacking:**
+
+- Compute both discounted totals from the same base.
+- Apply whichever yields the **lower** `totalPriceCents`.
+- Return which one won via `discountType` for UI labeling.
+
+### Step 3: Extend the API response
+
+Suggested shape (align naming with existing `totalPriceCents` camelCase):
+
+```typescript
+{
+  basePriceCents: number;      // pre-discount total
+  discountCents: number;       // base - total (0 if none)
+  discountType: "holiday" | "multi_day" | null;
+  totalPriceCents: number;     // final price (keep this name for backward compat)
+  hourlyRateCents: number;     // original rate (unchanged)
+  effectiveHourlyRateCents?: number; // optional, for multi-day display
+  durationInHours: number;
+}
+```
+
+### Step 4: Search UI (`VehicleListItem`)
+
+When dates are selected:
+
+- Call `useQuote`.
+- Show loading state per card.
+- Display e.g. strikethrough `formatCents(quote.basePriceCents)` + `formatCents(quote.totalPriceCents)`.
+- Badge: "17% holiday discount" or "$10/hr multi-day discount".
+
+### Step 5: Review UI (`ReviewPage`)
+
+Add rows to the existing `<dl>`:
+
+- Base rental
+- Discount (with type label)
+- Total
+
+`ReviewPage` already renders `quote.totalPriceCents` — it will pick up the discounted total automatically once the server changes.
+
+---
+
+## Decisions to make before coding
+
+These are not spelled out in the README and should go in `DECISIONS.md`:
+
+| Question                     | Options                                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **"Includes a holiday"**     | Any holiday calendar day strictly between start-day and end-day (exclusive)? Or any day in the inclusive range except start/end days?                                                            |
+| **Holiday year**             | Month/day only, applied to the year of the reservation?                                                                                                                                          |
+| **"> 3 days"**               | Calendar days (`end.day - start.day > 3`) vs `durationInHours > 72`                                                                                                                              |
+| **Date picker is date-only** | `VehicleList` uses `react-day-picker` without times — both dates are typically midnight, so duration may be whole-day multiples. This affects which reservations qualify for multi-day discount. |
+| **N API calls on search**    | One quote request per visible vehicle when dates are set. Fine for MVP; batch endpoint later if needed.                                                                                          |
+| **Price filter**             | `VehicleList` filters on raw `hourly_rate_cents`, not discounted total. Probably out of scope for Part 4, but worth noting.                                                                      |
+
+---
+
+## Suggested implementation order
+
+1. Add holiday constants + pure `calculateQuote` logic (optionally with unit tests).
+2. Wire into `calculateTotalPrice` / `getQuote` in `api.ts`.
+3. Update `Quote` type in `use-quote.ts`.
+4. Verify via review page (already wired).
+5. Add `useQuote` + discount display to `VehicleListItem`.
+6. Document decisions in `DECISIONS.md`.
+
+---
+
+## Out of scope for search-only, but relevant soon
+
+- **Part 5 (add-ons):** README says discounts apply to base rental only, not add-ons. Keep `calculateTotalPrice` separate from add-on math so you can compose them on the review page later.
+- **Persistence:** `Reservation.total_price_cents` in Prisma will eventually need the discounted total when you implement `createReservation`.
+
+The highest-leverage path is: **server pricing first**, then **extend `useQuote` + `VehicleListItem`** for search display. `ReviewPage` is mostly a consumer of the same quote data you already have.
+
+---
