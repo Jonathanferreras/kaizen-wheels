@@ -51,6 +51,10 @@ function Content() {
     startTime: start,
     endTime: end,
   });
+  const vehicle = getVehicleById(id);
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  let totalCostContent = null;
 
   if (!id) {
     throw new Error("No vehicle ID found.");
@@ -68,7 +72,31 @@ function Content() {
     throw quoteError;
   }
 
-  const vehicle = getVehicleById(id);
+  if (quoteLoading) {
+    totalCostContent = "Loading quote...";
+  } else if (quote) {
+    totalCostContent = formatCents(quote.totalPriceCents);
+  }
+
+  const handleConfirm = () => {
+    console.error("Not implemented");
+  };
+
+  const formattedDuration = formatDuration(
+    intervalToDuration({
+      start: startDate,
+      end: endDate,
+    }),
+    { delimiter: ", " },
+  );
+
+  const renderDiscountType = () => {
+    if (quote.discountType === "HOLIDAY") {
+      return <span>Holiday Discount 17% OFF</span>;
+    } else if (quote.discountType === "MULTI_DAY") {
+      return <span>Multi-day Discount $10/hr OFF</span>;
+    }
+  };
 
   if (!vehicle) {
     return <div>Vehicle not found.</div>;
@@ -87,34 +115,10 @@ function Content() {
     );
   }
 
-  const startDate = new Date(start);
-  const endDate = new Date(end);
-
-  const handleConfirm = () => {
-    console.error("Not implemented");
-  };
-
-  const formattedDuration = formatDuration(
-    intervalToDuration({
-      start: startDate,
-      end: endDate,
-    }),
-    { delimiter: ", " },
-  );
-
-  let totalCostContent = null;
-  if (quoteLoading) {
-    totalCostContent = "Loading quote...";
-  } else if (quote) {
-    totalCostContent = formatCents(quote.totalPriceCents);
-  }
-
   return (
     <div>
       <VehicleDetails vehicle={vehicle} />
-
       <Separator />
-
       <div>
         <h3>Reservation Summary</h3>
         <div>
@@ -122,8 +126,17 @@ function Content() {
             <div>
               <dt>Hourly Rate</dt>
               <dd>
-                <span>{formatCents(vehicle.hourly_rate_cents)}</span>
-                <span>/hr</span>
+                <p>
+                  {quote?.discountType === "MULTI_DAY" ? (
+                    <>
+                      <s>{formatCents(vehicle.hourly_rate_cents)}</s>
+                      <span>{formatCents(quote?.hourlyRateCents)}</span>
+                    </>
+                  ) : (
+                    <span>{formatCents(vehicle.hourly_rate_cents)}</span>
+                  )}
+                  <span>/hr</span>
+                </p>
               </dd>
             </div>
             <div>
@@ -132,13 +145,14 @@ function Content() {
             </div>
             <div>
               <dt>Total Cost</dt>
-              <dd>{totalCostContent}</dd>
+              <dd>
+                {totalCostContent}{" "}
+                {quote?.discountApplied && renderDiscountType()}
+              </dd>
             </div>
           </dl>
-
           <Timeline startDate={startDate} endDate={endDate} />
         </div>
-
         <Button onClick={handleConfirm}>Confirm reservation</Button>
       </div>
     </div>
