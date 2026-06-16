@@ -7,12 +7,13 @@ import { Separator } from "@/components/shared/ui/separator";
 import { formatCents } from "@/lib/formatters";
 import { format, formatDuration, intervalToDuration } from "date-fns";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { MiniPageLayout } from "../shared/MiniPageLayout";
 import { useQuote } from "@/hooks/use-quote";
 import { useVehicles } from "@/hooks/use-vehicles";
 import { toIsoDateParam } from "@/lib/dates";
+import { useAddOns } from "@/hooks/use-addOns";
 
 function Timeline({ startDate, endDate }: { startDate: Date; endDate: Date }) {
   return (
@@ -37,11 +38,17 @@ function Content() {
   const id = searchParams.get("id");
   const start = toIsoDateParam(searchParams.get("start"));
   const end = toIsoDateParam(searchParams.get("end"));
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+
+  const [selectedAddOnIds, setSelectedAddOnIds] = useState<string[]>([]);
+
   const {
     loading: vehicleLoading,
     error: vehicleError,
     getVehicleById,
   } = useVehicles();
+
   const {
     quote,
     loading: quoteLoading,
@@ -51,17 +58,28 @@ function Content() {
     startTime: start,
     endTime: end,
   });
+  const { addOns, loading: addOnsLoading, error: addOnsError } = useAddOns();
+
+  const addOnsTotalCents = useMemo(() => {
+    if (!addOns) return 0;
+
+    return selectedAddOnIds.reduce((total, addOnId) => {
+      const addOn = addOns.find((item) => item.id === addOnId);
+
+      if (!addOn) return total;
+
+      return total + addOn.total_price_cents;
+    }, 0);
+  }, [addOns, selectedAddOnIds]);
+
   const vehicle = getVehicleById(id);
-  const startDate = new Date(start);
-  const endDate = new Date(end);
-  let totalCostContent = null;
 
   if (!id) {
     throw new Error("No vehicle ID found.");
   }
 
-  if (vehicleLoading) {
-    return <div>Loading vehicle...</div>;
+  if (vehicleLoading || addOnsLoading) {
+    return <div>Loading reservation...</div>;
   }
 
   if (vehicleError) {
@@ -72,31 +90,9 @@ function Content() {
     throw quoteError;
   }
 
-  if (quoteLoading) {
-    totalCostContent = "Loading quote...";
-  } else if (quote) {
-    totalCostContent = formatCents(quote.totalPriceCents);
+  if (addOnsError) {
+    throw addOnsError;
   }
-
-  const handleConfirm = () => {
-    console.error("Not implemented");
-  };
-
-  const formattedDuration = formatDuration(
-    intervalToDuration({
-      start: startDate,
-      end: endDate,
-    }),
-    { delimiter: ", " },
-  );
-
-  const renderDiscountType = () => {
-    if (quote.discountType === "HOLIDAY") {
-      return <span>Holiday Discount 17% OFF</span>;
-    } else if (quote.discountType === "MULTI_DAY") {
-      return <span>Multi-day Discount $10/hr OFF</span>;
-    }
-  };
 
   if (!vehicle) {
     return <div>Vehicle not found.</div>;
@@ -115,12 +111,73 @@ function Content() {
     );
   }
 
+  const totalCostContent = quoteLoading
+    ? "Loading quote..."
+    : quote
+      ? formatCents(quote.totalPriceCents + addOnsTotalCents)
+      : null;
+
+  const handleAdd = (addOnId: string) => {
+    setSelectedAddOnIds((current) => [...current, addOnId]);
+  };
+
+  const handleRemove = (addOnId: string) => {
+    setSelectedAddOnIds((current) => {
+      const index = current.indexOf(addOnId);
+
+      if (index === -1) {
+        return current;
+      }
+
+      return current.filter((_, i) => i !== index);
+    });
+  };
+
+  const handleToggle = (addOnId: string) => {
+    setSelectedAddOnIds((current) =>
+      current.includes(addOnId)
+        ? current.filter((id) => id !== addOnId)
+        : [...current, addOnId],
+    );
+  };
+
+  const handleConfirm = () => {
+    console.log({
+      vehicleId: id,
+      startTime: start,
+      endTime: end,
+      addOns: selectedAddOnIds,
+    });
+  };
+
+  const formattedDuration = formatDuration(
+    intervalToDuration({
+      start: startDate,
+      end: endDate,
+    }),
+    { delimiter: ", " },
+  );
+
+  const renderDiscountType = () => {
+    if (quote?.discountType === "HOLIDAY") {
+      return <span>Holiday Discount 17% OFF</span>;
+    }
+
+    if (quote?.discountType === "MULTI_DAY") {
+      return <span>Multi-day Discount $10/hr OFF</span>;
+    }
+
+    return null;
+  };
+
   return (
     <div>
       <VehicleDetails vehicle={vehicle} />
       <Separator />
+
       <div>
         <h3>Reservation Summary</h3>
+
         <div>
           <dl>
             <div>
@@ -129,8 +186,8 @@ function Content() {
                 <p>
                   {quote?.discountType === "MULTI_DAY" ? (
                     <>
-                      <s>{formatCents(vehicle.hourly_rate_cents)}</s>
-                      <span>{formatCents(quote?.hourlyRateCents)}</span>
+                      <s>{formatCents(vehicle.hourly_rate_cents)}</s>{" "}
+                      <span>{formatCents(quote.hourlyRateCents)}</span>
                     </>
                   ) : (
                     <span>{formatCents(vehicle.hourly_rate_cents)}</span>
@@ -139,10 +196,57 @@ function Content() {
                 </p>
               </dd>
             </div>
+
             <div>
               <dt>Duration</dt>
               <dd>{formattedDuration}</dd>
             </div>
+
+            <div>
+              <dt>Optional Add-ons</dt>
+              <dd>
+                {addOns?.map((addOn) => {
+                  const quantity = selectedAddOnIds.filter(
+                    (id) => id === addOn.id,
+                  ).length;
+
+                  const isSelected = quantity > 0;
+
+                  return (
+                    <div key={addOn.id}>
+                      <p>{addOn.name}</p>
+                      <p>{addOn.description}</p>
+                      <p>{formatCents(addOn.total_price_cents)}</p>
+
+                      {addOn.billing_type === "PER_RENTAL" ? (
+                        <>
+                          <Button onClick={() => handleAdd(addOn.id)}>+</Button>
+                          <span>{quantity}</span>
+                          <Button
+                            onClick={() => handleRemove(addOn.id)}
+                            disabled={quantity === 0}
+                          >
+                            -
+                          </Button>
+                        </>
+                      ) : (
+                        <Button onClick={() => handleToggle(addOn.id)}>
+                          {isSelected ? "Remove" : "Add"}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </dd>
+            </div>
+
+            {addOnsTotalCents > 0 && (
+              <div>
+                <dt>Add-ons Total</dt>
+                <dd>{formatCents(addOnsTotalCents)}</dd>
+              </div>
+            )}
+
             <div>
               <dt>Total Cost</dt>
               <dd>
@@ -151,8 +255,10 @@ function Content() {
               </dd>
             </div>
           </dl>
+
           <Timeline startDate={startDate} endDate={endDate} />
         </div>
+
         <Button onClick={handleConfirm}>Confirm reservation</Button>
       </div>
     </div>
