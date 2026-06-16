@@ -1,5 +1,5 @@
 import { prisma } from "../../app/lib/prisma";
-import { VEHICLES, RESERVATIONS } from "../../app/server/data";
+import { VEHICLES, RESERVATIONS, ADDONS } from "../../app/server/data";
 
 async function main() {
   if ((await prisma.vehicle.count()) === 0) {
@@ -48,6 +48,28 @@ async function main() {
     console.log("All reservations:", JSON.stringify(allReservations, null, 2));
   } else {
     console.log("Reservations already seeded");
+  }
+
+  if ((await prisma.addOn.count()) === 0) {
+    for (const addon of ADDONS) {
+      await prisma.addOn.create({
+        data: {
+          name: addon.name,
+          description: addon.description,
+          total_price_cents: addon.total_price_cents,
+          billing_type: addon.billing_type,
+        },
+      });
+    }
+
+    const allAddOns = await prisma.addOn.findMany({
+      include: {
+        reservationAddons: true,
+      },
+    });
+    console.log("All Add-ons:", JSON.stringify(allAddOns, null, 2));
+  } else {
+    console.log("Add-ons already seeded");
   }
 }
 

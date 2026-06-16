@@ -245,3 +245,51 @@ export const HOLIDAYS = [
   "11/05", // My actual birthday!!!
   "12/18",
 ];
+
+export type AddOnsBillingType = "PER_DAY" | "PER_RENTAL";
+
+export interface AddOns {
+  id: string;
+  name: string;
+  description: string;
+  total_price_cents: number;
+  billing_type: AddOnsBillingType;
+}
+
+export const ADDONS: AddOns[] = [
+  {
+    id: "1",
+    name: "GPS Navigation",
+    description: "Suction-mount GPS unit",
+    total_price_cents: 500,
+    billing_type: "PER_RENTAL",
+  },
+  {
+    id: "2",
+    name: "Child seat",
+    description: "Forward-facing booster",
+    total_price_cents: 800,
+    billing_type: "PER_DAY",
+  },
+  {
+    id: "3",
+    name: "Additional driver",
+    description: "Allow a second registered driver",
+    total_price_cents: 1200,
+    billing_type: "PER_DAY",
+  },
+  {
+    id: "4",
+    name: "Pre-paid fuel",
+    description: "Return the car empty",
+    total_price_cents: 4000,
+    billing_type: "PER_RENTAL",
+  },
+  {
+    id: "5",
+    name: "Roadside assistance",
+    description: "24/7 emergency support",
+    total_price_cents: 400,
+    billing_type: "PER_DAY",
+  },
+];
