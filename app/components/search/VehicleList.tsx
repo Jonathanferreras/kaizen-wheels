@@ -88,94 +88,154 @@ export function VehicleList({
   ]);
 
   return (
-    <div>
-      <div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {formatDateRange(dateRange) ?? <span>Pick dates</span>}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="range"
-              selected={dateRange}
-              onSelect={setDateRange}
-              numberOfMonths={2}
-            />
-          </PopoverContent>
-        </Popover>
-        {dateRange?.from && (
-          <Button variant="ghost" onClick={() => setDateRange(undefined)}>
-            Clear
-          </Button>
-        )}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline">
-              <DollarSign className="mr-2 h-4 w-4" />
-              {isPriceFilterActive ? (
-                <>
-                  {formatCents(minPrice)} – {formatCents(maxSelectedPrice)}/hr
-                </>
-              ) : (
-                <span>Price</span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80" align="start">
-            <RangeSlider
-              min={0}
-              max={maxPrice}
-              step={100}
-              value={[minPrice, maxSelectedPrice]}
-              onValueChange={(value) => setPriceRange([value[0], value[1]])}
-            />
-          </PopoverContent>
-        </Popover>
-        {isPriceFilterActive && (
-          <Button variant="ghost" onClick={() => setPriceRange(undefined)}>
-            Clear
-          </Button>
-        )}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline">
-              <Users className="mr-2 h-4 w-4" />
-              <span>Passengers {passengerCount}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-40" align="start">
-            <Select
-              value={String(passengerCount)}
-              onValueChange={(value) => setPassengerCount(Number(value))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: maxPassengerCount }, (_, i) => i + 1).map(
-                  (count) => (
-                    <SelectItem key={count} value={String(count)}>
-                      {count}
-                    </SelectItem>
-                  ),
-                )}
-              </SelectContent>
-            </Select>
-          </PopoverContent>
-        </Popover>
-        {passengerCount !== 2 && (
-          <Button variant="ghost" onClick={() => setPassengerCount(2)}>
-            Clear
-          </Button>
-        )}
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <div className="rounded-2xl border bg-white p-4 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-slate-950">
+            Find your ride
+          </h2>
+          <p className="text-sm text-slate-500">
+            Filter by dates, price, and passenger capacity.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start sm:w-auto"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {formatDateRange(dateRange) ?? <span>Pick dates</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+
+            {dateRange?.from && (
+              <Button variant="ghost" onClick={() => setDateRange(undefined)}>
+                Clear
+              </Button>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start sm:w-auto"
+                >
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  {isPriceFilterActive ? (
+                    <>
+                      {formatCents(minPrice)} – {formatCents(maxSelectedPrice)}
+                      /hr
+                    </>
+                  ) : (
+                    <span>Price</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-5" align="start">
+                <div className="mb-4 flex items-center justify-between text-sm">
+                  <span className="font-medium text-slate-700">
+                    Hourly price
+                  </span>
+                  <span className="text-slate-500">
+                    {formatCents(minPrice)} – {formatCents(maxSelectedPrice)}
+                  </span>
+                </div>
+
+                <RangeSlider
+                  min={0}
+                  max={maxPrice}
+                  step={100}
+                  value={[minPrice, maxSelectedPrice]}
+                  onValueChange={(value) => setPriceRange([value[0], value[1]])}
+                />
+              </PopoverContent>
+            </Popover>
+
+            {isPriceFilterActive && (
+              <Button variant="ghost" onClick={() => setPriceRange(undefined)}>
+                Clear
+              </Button>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start sm:w-auto"
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  <span>Passengers {passengerCount}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-44 p-4" align="start">
+                <Select
+                  value={String(passengerCount)}
+                  onValueChange={(value) => setPassengerCount(Number(value))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(
+                      { length: maxPassengerCount },
+                      (_, i) => i + 1,
+                    ).map((count) => (
+                      <SelectItem key={count} value={String(count)}>
+                        {count}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </PopoverContent>
+            </Popover>
+
+            {passengerCount !== 2 && (
+              <Button variant="ghost" onClick={() => setPassengerCount(2)}>
+                Clear
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
+
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">
+          Showing{" "}
+          <span className="font-medium text-slate-900">
+            {filteredVehicles.length}
+          </span>{" "}
+          {filteredVehicles.length === 1 ? "vehicle" : "vehicles"}
+        </p>
+      </div>
+
       {filteredVehicles.length === 0 ? (
-        <p>No vehicles found.</p>
+        <div className="rounded-2xl border border-dashed bg-white p-10 text-center shadow-sm">
+          <p className="text-base font-medium text-slate-900">
+            No vehicles found
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Try adjusting your dates, price, or passenger count.
+          </p>
+        </div>
       ) : (
-        <ul>
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredVehicles.map((vehicle) => (
             <VehicleListItem
               key={vehicle.id}
