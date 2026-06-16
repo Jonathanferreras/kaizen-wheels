@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "ts": "tsc --noEmit",
+    "setup": "npm run prisma-gen && npm run seed",
+    "prisma-gen": "npx prisma generate",
     "seed": "npx tsx ./prisma/scripts/seed.ts"
   },
   "dependencies": {
