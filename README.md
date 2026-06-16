@@ -1,90 +1,163 @@
 <img src="public/logo.svg" alt="Kaizen Logo" width="64" style="background: #666; padding: 0.25rem; border-radius: 100%; margin-bottom: 1rem;" />
 
+# Kaizen Wheels
+
+A vehicle rental application built with Next.js, TypeScript, Prisma, SQLite, Tailwind CSS, and shadcn/ui.
+
+This project was completed as part of the Kaizen Wheels Product Engineer take-home assessment.
+
+## Features
+
+### Persistence
+
+- Migrated vehicle and reservation data from in-memory storage to SQLite
+- Prisma ORM for database access and migrations
+- Seeded database with vehicle and reservation data
+
+### Vehicle Search & Filtering
+
+- Availability-aware date range filtering
+- Passenger count filtering
+- Price filtering
+
+### Discounts
+
+Supports two discount types:
+
+- Holiday Discount (17% off reservation total)
+- Long Reservation Discount ($10/hour discount for reservations longer than 3 days)
+
+Discounts do not stack. If both discounts apply, the reservation receives whichever discount produces the lower total price.
+
+### Optional Add-ons
+
+Support for the following add-ons:
+
+- GPS Navigation
+- Child Seat
+- Additional Driver
+- Pre-paid Fuel
+- Roadside Assistance
+
+Add-ons can be selected during the review step and are reflected in the reservation pricing.
+
+### Styling
+
+- Tailwind CSS
+- shadcn/ui components
+- Responsive layouts and improved user experience throughout the booking flow
+
+---
+
+## Tech Stack
+
+- Next.js
+- React
+- TypeScript
+- Prisma
+- SQLite
+- Tailwind CSS
+- shadcn/ui
+
+---
+
 ## Getting Started
 
-To get the project running do the following:
+### Clone the repository
 
-1. Open a terminal and run `git clone https://github.com/Jonathanferreras/kaizen-wheels.git`
-2. Install dependencies by running `npm install`
-3. Setup the database by running `npm run setup`
-4. To run the project run `npm run dev`
-5. Navigate to http://localhost:3000/ in your browser :)
+```bash
+git clone https://github.com/Jonathanferreras/kaizen-wheels.git
+```
 
-## Project requirements
+### Install dependencies
 
-This is Kaizen Wheels: the start of a car rental app. The design is unfinished, there's no filtering, and all data lives in memory. You will harden it across five areas. Parts 1 and 2 are cross-cutting concerns that touch the whole app; Parts 3, 4, and 5 are functional features.
+```bash
+npm install
+```
 
-### **Part 1: Styling**
+### Setup database
 
-The app currently ships with no visual design. Add styling you'd be comfortable shipping to real users.
+This command will:
 
-Tailwind is configured and the shadcn/ui primitives in `app/components/shared/ui/` are available. Use them, swap them out, or bring your own approach — the choice is yours, but be ready to justify it.
+- Generate the Prisma client
+- Run database migrations
+- Seed the database
 
-### **Part 2: Persistence**
+```bash
+npm run setup
+```
 
-Today, vehicles and reservations live in memory in `app/server/data.ts`. Move them to a real database. We recommend Postgres, but you can pick any persistence layer you prefer.
+### Start the application
 
-You're responsible for:
+```bash
+npm run dev
+```
 
-- Schema design for vehicles and reservations.
-- Migrations.
-- Seed data (you can start from the existing in-memory data in `app/server/data.ts`).
-- Connection setup.
-- Clear documentation explaining how to run the project locally — prerequisites, environment variables, and commands — so we can pull it down and get it working without guessing.
+Open:
 
-### **Part 3: Filters**
+```text
+http://localhost:3000
+```
 
-There are no filters in the app today. Add filtering so a user can find a vehicle for their trip. At minimum, support:
+---
 
-- A date/time range for pickup and drop-off, with vehicles filtered by availability.
-- Whatever additional filters you think are useful (e.g. price, vehicle class, passenger count, make).
+## Database
 
-Briefly justify which filters you chose and why.
+The application uses SQLite for local development.
 
-### **Part 4: Discounts**
+Prisma schema:
 
-We'd like to add discounts that satisfy these requirements:
+```text
+prisma/schema.prisma
+```
 
-- A reservation that includes a holiday but does not start or end on that holiday should receive a 17% discount off the total price. (A list of fictitious holidays is included below.)
-- A reservation for more than 3 days should receive a $10/hr discount on the hourly rate.
-- These discounts cannot both apply at the same time. If they conflict, the discount with the best price applies to the reservation.
-- Visitors should see the discount reflected during search and checkout, including on the review page.
+To inspect the database:
 
-List of fictitious holidays (10 randomly sampled dates in the year):
+```bash
+npx prisma studio
+```
 
-- Jan 21
-- Feb 12
-- Mar 04
-- May 02
-- Jun 16
-- Jul 26
-- Aug 03
-- Sep 01
-- Nov 05
-- Dec 18
+To reset and reseed the database:
 
-### **Part 5: Optional add-ons**
+```bash
+npx prisma migrate reset
+```
 
-Real rental flows let customers add extras at checkout (GPS, child seats, insurance, etc.). Add support for selecting optional add-ons on the review page and reflecting them in the price.
+---
 
-Requirements:
+## Project Structure
 
-- The review page should let the user pick from a list of add-ons.
-- Each add-on has its own price model — some are charged per rental, some per day (see the list below).
-- The total cost should update live as the user toggles add-ons, and the page should show a line-item breakdown (base rental, each selected add-on, discount if applicable, total).
-- Discounts from Part 4 apply to the base rental rate only, not to add-ons.
-- Selections do not need to persist beyond the review page session.
+```text
+app/
+components/
+hooks/
+lib/
+prisma/
+server/
+```
 
-Define a data shape that supports the add-ons below and would extend cleanly to new ones in the future.
+---
 
-Available add-ons:
+## Assumptions
 
-| Name                | Description                      | Price          |
-| ------------------- | -------------------------------- | -------------- |
-| GPS Navigation      | Suction-mount GPS unit           | $5 per rental  |
-| Child seat          | Forward-facing booster           | $8 per day     |
-| Additional driver   | Allow a second registered driver | $12 per day    |
-| Pre-paid fuel       | Return the car empty             | $40 per rental |
-| Roadside assistance | 24/7 emergency support           | $4 per day     |
+- Vehicle availability is determined by checking for overlapping reservations.
+- Discounts apply only to the base rental cost.
+- Discounts cannot be combined.
+- The best available discount is selected automatically.
+- Add-ons are selected during the review step of the booking flow.
 
-UI and implementation details are up to you. In your submission, briefly justify the data model you chose and the UI/UX decisions you made — what tradeoffs you considered, what you'd build differently with more time, and anything you intentionally left out.
+---
+
+## Additional Documentation
+
+Implementation decisions and tradeoffs:
+
+```text
+DECISIONS.md
+```
+
+AI usage log:
+
+```text
+AI_LOG.md
+```
