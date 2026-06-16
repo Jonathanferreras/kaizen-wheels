@@ -1,5 +1,15 @@
 <img src="public/logo.svg" alt="Kaizen Logo" width="64" style="background: #666; padding: 0.25rem; border-radius: 100%; margin-bottom: 1rem;" />
 
+## Getting Started
+
+To get the project running do the following:
+
+1. Open a terminal and run `git clone https://github.com/Jonathanferreras/kaizen-wheels.git`
+2. Install dependencies by running `npm install`
+3. Setup the database by running `npm run setup`
+4. To run the project run `npm run dev`
+5. Navigate to http://localhost:3000/ in your browser :)
+
 ## Project requirements
 
 This is Kaizen Wheels: the start of a car rental app. The design is unfinished, there's no filtering, and all data lives in memory. You will harden it across five areas. Parts 1 and 2 are cross-cutting concerns that touch the whole app; Parts 3, 4, and 5 are functional features.
@@ -40,7 +50,6 @@ We'd like to add discounts that satisfy these requirements:
 - These discounts cannot both apply at the same time. If they conflict, the discount with the best price applies to the reservation.
 - Visitors should see the discount reflected during search and checkout, including on the review page.
 
-
 List of fictitious holidays (10 randomly sampled dates in the year):
 
 - Jan 21
@@ -70,12 +79,12 @@ Define a data shape that supports the add-ons below and would extend cleanly to 
 
 Available add-ons:
 
-| Name | Description | Price |
-| --- | --- | --- |
-| GPS Navigation | Suction-mount GPS unit | $5 per rental |
-| Child seat | Forward-facing booster | $8 per day |
-| Additional driver | Allow a second registered driver | $12 per day |
-| Pre-paid fuel | Return the car empty | $40 per rental |
-| Roadside assistance | 24/7 emergency support | $4 per day |
+| Name                | Description                      | Price          |
+| ------------------- | -------------------------------- | -------------- |
+| GPS Navigation      | Suction-mount GPS unit           | $5 per rental  |
+| Child seat          | Forward-facing booster           | $8 per day     |
+| Additional driver   | Allow a second registered driver | $12 per day    |
+| Pre-paid fuel       | Return the car empty             | $40 per rental |
+| Roadside assistance | 24/7 emergency support           | $4 per day     |
 
 UI and implementation details are up to you. In your submission, briefly justify the data model you chose and the UI/UX decisions you made — what tradeoffs you considered, what you'd build differently with more time, and anything you intentionally left out.
