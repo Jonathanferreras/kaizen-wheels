@@ -1,12 +1,15 @@
 import { parseDateTimeParam } from "@/lib/dates";
 import { DateTime } from "luxon";
 import {
+  AddonForReservation,
+  getAddOnById,
+  getAddOns,
   getReservationById,
   getVehicleById,
   getVehicles,
   VehicleWithReservations,
 } from "./data_helpers";
-import { Discounts, HOLIDAYS } from "./data";
+import { Discounts, AddOns, HOLIDAYS } from "./data";
 
 const parseAndValidateTimeRange = (startTime: string, endTime: string) => {
   const start = parseDateTimeParam(startTime);
@@ -28,10 +31,12 @@ const calculateTotalPrice = (
   start: DateTime,
   end: DateTime,
   hourlyRateCents: number,
+  addOns: AddOns[],
 ) => {
   const durationInHours = end.diff(start, "hours").hours || 0;
+  const durationInDays = end.diff(start, "days").days;
   const hasHoliday = HOLIDAYS.some((h) => includesHoliday(h, start, end));
-  const isMultiDay = end.diff(start, "days").days > 3;
+  const isMultiDay = durationInDays > 3;
   const baseCost = hourlyRateCents * durationInHours;
   const holidayCost = baseCost * 0.83;
   const multiDayCost = (hourlyRateCents - 1000) * durationInHours;
@@ -50,6 +55,16 @@ const calculateTotalPrice = (
     discountType = "HOLIDAY";
   }
 
+  if (addOns.length > 0) {
+    for (let addOn of addOns) {
+      if (addOn.billing_type === "PER_DAY") {
+        totalPriceCents += addOn.total_price_cents * durationInDays;
+      } else if (addOn.billing_type === "PER_RENTAL") {
+        totalPriceCents += addOn.total_price_cents;
+      }
+    }
+  }
+
   return {
     totalPriceCents,
     hourlyRateCents,
@@ -63,9 +78,11 @@ const validateReservationAndGetVehicle = async (input: {
   vehicleId: string;
   startTime: string;
   endTime: string;
+  addOnIds?: string[];
 }) => {
-  const { vehicleId, startTime, endTime } = input;
+  const { vehicleId, startTime, endTime, addOnIds = [] } = input;
   const { start, end } = parseAndValidateTimeRange(startTime, endTime);
+  const addOns = [];
 
   const vehicle = await getVehicleById(vehicleId);
 
@@ -73,7 +90,17 @@ const validateReservationAndGetVehicle = async (input: {
     throw new Error("NOT_FOUND: Vehicle not found");
   }
 
-  return { vehicle, start, end };
+  for (let addOnId of addOnIds) {
+    const addOn = await getAddOnById(addOnId);
+
+    if (!addOn) {
+      throw new Error("NOT_FOUND: AddOn not found");
+    }
+
+    addOns.push(addOn);
+  }
+
+  return { vehicle, start, end, addOns };
 };
 
 async function searchVehicles(): Promise<{
@@ -112,13 +139,42 @@ function getReservation(id: string) {
   return reservation;
 }
 
+async function fetchAddOns() {
+  let addOns: AddonForReservation[] = [];
+
+  try {
+    addOns = await getAddOns();
+
+    if (!addOns) {
+      throw new Error("NOT_FOUND: Add-ons not found");
+    }
+  } catch (error) {
+    throw new Error(error);
+  }
+
+  return { addOns };
+}
+
 async function getQuote(input: {
   vehicleId: string;
   startTime: string;
   endTime: string;
+  addOnIds?: string[];
 }) {
-  const { vehicle, start, end } = await validateReservationAndGetVehicle(input);
-  return calculateTotalPrice(start, end, vehicle.hourly_rate_cents);
+  const {
+    vehicle,
+    start,
+    end,
+    addOns = [],
+  } = await validateReservationAndGetVehicle(input);
+  const totalPrice = calculateTotalPrice(
+    start,
+    end,
+    vehicle.hourly_rate_cents,
+    addOns,
+  );
+
+  return totalPrice;
 }
 
 function includesHoliday(
@@ -140,4 +196,5 @@ export const API = {
   getVehicle,
   getReservation,
   getQuote,
+  fetchAddOns,
 };

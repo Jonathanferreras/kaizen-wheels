@@ -9,6 +9,8 @@ export type VehicleReservation = Prisma.ReservationGetPayload<{
   include: { vehicle: true };
 }>;
 
+export type AddonForReservation = Prisma.AddOnGetPayload<{}>;
+
 export const getVehicleById = async (
   id: string,
 ): Promise<VehicleWithReservations | undefined> => {
@@ -30,5 +32,17 @@ export const getReservationById = (
 export const getVehicles = () => {
   return prisma.vehicle.findMany({
     include: { reservations: true },
+  });
+};
+
+export const getAddOns = () => {
+  return prisma.addOn.findMany();
+};
+
+export const getAddOnById = (
+  id: string,
+): Promise<AddonForReservation | undefined> => {
+  return prisma.addOn.findUnique({
+    where: { id },
   });
 };
