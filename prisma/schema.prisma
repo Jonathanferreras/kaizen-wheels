@@ -29,13 +29,38 @@ model Vehicle {
 }
 
 model Reservation {
-  id                String   @id @default(uuid())
+  id                String             @id @default(uuid())
   vehicle_id        Int
   start_time        DateTime
   end_time          DateTime
   total_price_cents Int
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  created_At        DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  vehicle           Vehicle            @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
+  
+  reservationAddons ReservationAddon[]
+}
 
-  vehicle           Vehicle  @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
+model AddOn {
+  id                String             @id @default(uuid())
+  name              String
+  description       String
+  total_price_cents Int
+  billing_type      String
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  reservationAddons ReservationAddon[]
+}
+
+model ReservationAddon {
+  id             String      @id @default(uuid())
+  reservation_id String
+  addon_id       String
+  quantity       Int
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  reservation    Reservation @relation(fields: [reservation_id], references: [id], onDelete: Cascade)
+  addon          AddOn       @relation(fields: [addon_id], references: [id], onDelete: Cascade)
 }
